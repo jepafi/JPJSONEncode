@@ -8,16 +8,28 @@ The method "DataSetToJSONString" converts the entire DataSet or you can specify 
 Usage:
 
 	var
-	  json: String;
+	  jpjson: TJPJSONEncode;
+	  sJSON: String;
 	begin
-	  json := DataSetToJSONString(SQLQuery1);
+	  try
+	    jpjson := TJPJSONEncode.Create;
+	    sJSON := jpjson.DataSetToJSONString(SQLQuery1);
+	  finally
+	    jpjson.Free;
+	  end;
 	end;
 
 Or:
 
 	var
-	  json: String;
+	  jpjson: TJPJSONEncode;
+	  sJSON: String;
 	  aFields: Array[0..1] of String = ('id', 'name');
 	begin
-	  json := DataSetToJSONString(SQLQuery1, aFields);
+	  try
+	    jpjson := TJPJSONEncode.Create;
+	    sJSON := jpjson.DataSetToJSONString(SQLQuery1, aFields);
+	  finally
+	    jpjson.Free;
+	  end;
 	end;
