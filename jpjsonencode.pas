@@ -1,9 +1,9 @@
 {
 JPJSON Encode
 
-Version: 1.0
+Version: 1.1
 
-Author: JEAN PATRICK - www.jpsoft.com.br - jpsoft-sac-pa@hotmail.com
+Author: JEAN PATRICK - www.jeansistemas.net - jpsoft-sac-pa@hotmail.com
 
 Date: 2012-07-05
 
@@ -25,8 +25,8 @@ type
 
   TJPJSONEncode = class
   public
-    function DataSetToJSONString(DataSet: TDataSet): string;
-    function DataSetToJSONString(DataSet: TDataSet; aFields: array of string): string;
+    function DataSetToJSONArray(DataSet: TDataSet; CheckedImgPath: string = 'true';
+      UncheckedImgPath: string = 'false'): string;
   private
     function EscapeJSONString(sJSON: string): string;
   end;
@@ -36,120 +36,115 @@ implementation
 
 { TJPJSONEncode }
 
-function TJPJSONEncode.DataSetToJSONString(DataSet: TDataSet): string;
+function TJPJSONEncode.DataSetToJSONArray(DataSet: TDataSet;
+  CheckedImgPath: string; UncheckedImgPath: string): string;
 var
   i: integer;
+  jf: TFormatSettings;
 begin
   Result := '';
-  if (DataSet.IsEmpty) then
-    Exit;
-  if not (DataSet.Active) then
+  if (CheckedImgPath <> 'true') then
+    CheckedImgPath := '"<img src=''' + CheckedImgPath +
+      ''' style=''padding-top:3px;''></img>"';
+  if (UncheckedImgPath <> 'false') then
+    UncheckedImgPath := '"<img src=''' + UncheckedImgPath +
+      ''' style=''padding-top:3px;''></img>"';
+  with DataSet do
   begin
-    try
-      DataSet.Open;
-    except
-      raise Exception.Create('JPJSONEncode error: Unable to open DataSet!');
-    end;
-  end;
-  DataSet.First;
-  while not (DataSet.EOF) do
-  begin
-    Result += '{';
-    for i := 0 to DataSet.FieldCount - 1 do
+    if (IsEmpty) then
     begin
-      if (i > 0) then
-        Result += ',';
-      Result += '"' + DataSet.Fields[i].FieldName + '":';
-      if DataSet.Fields[i].IsNull then
-        Result += 'null'
-      else
-      begin
-        case DataSet.Fields[i].DataType of
-          ftSmallint, ftInteger: Result += DataSet.Fields[i].AsString;
-          ftFloat: Result += FloatToStr(DataSet.Fields[i].AsFloat);
-          ftBoolean: if (DataSet.Fields[i].AsBoolean) then
-              Result += 'true'
-            else
-              Result += 'false';
-          else
-            Result += '"' + EscapeJSONString(DataSet.Fields[i].AsString) + '"';
-        end;
+      Result := '[]';
+      Exit;
+    end;
+    if not (Active) then
+    begin
+      try
+        Open;
+      except
+        raise Exception.Create('JPJSONEncode error: Unable to open DataSet!');
       end;
     end;
-    Result += '}';
-    DataSet.Next;
-    if not (DataSet.EOF) then
-      Result += ',';
-  end;
-  Result := '[' + Result + ']';
-end;
-
-function TJPJSONEncode.DataSetToJSONString(DataSet: TDataSet;
-  aFields: array of string): string;
-var
-  i: integer;
-begin
-  Result := '';
-  if (DataSet.IsEmpty) then
-    Exit;
-  if (Length(aFields) = 0) then
-    Exit;
-  if not (DataSet.Active) then
-  begin
-    try
-      DataSet.Open;
-    except
-      raise Exception.Create('JPJSONEncode error: Unable to open DataSet!');
-    end;
-  end;
-  DataSet.First;
-  while not (DataSet.EOF) do
-  begin
-    Result += '{';
-    try
-      for i := 0 to Length(aFields) - 1 do
+    First;
+    jf := DefaultFormatSettings;
+    jf.DecimalSeparator := '.';
+    jf.ThousandSeparator := ',';
+    while not (EOF) do
+    begin
+      Result += '{';
+      for i := 0 to FieldCount - 1 do
       begin
         if (i > 0) then
           Result += ',';
-        Result += '"' + DataSet.FieldByName(aFields[i]).FieldName + '":';
-        if DataSet.FieldByName(aFields[i]).IsNull then
+        Result += '"' + Fields[i].FieldName + '":';
+        if Fields[i].IsNull then
           Result += 'null'
         else
         begin
-          case DataSet.FieldByName(aFields[i]).DataType of
-            ftSmallint, ftInteger: Result += DataSet.FieldByName(aFields[i]).AsString;
-            ftFloat: Result += FloatToStr(DataSet.FieldByName(aFields[i]).AsFloat);
-            ftBoolean: if (DataSet.FieldByName(aFields[i]).AsBoolean) then
-                Result += 'true'
+          case Fields[i].DataType of
+            ftSmallint, ftInteger:
+            begin
+              if (Fields[i].Tag > 0) then
+                Result += '"' + FormatFloat(
+                  StringOfChar('0', Fields[i].Tag), Fields[i].AsFloat) + '"'
               else
-                Result += 'false';
+                Result += Fields[i].AsString;
+            end;
+            ftFloat:
+            begin
+              if (Fields[i].Tag = 1) then
+                Result += '"' + FloatToStrF(Fields[i].AsFloat, ffCurrency, 14, 2) + '"'
+              else if (Fields[i].Tag = 2) then
+                Result += '"' + FloatToStrF(Fields[i].AsFloat, ffNumber, 14, 2) + '"'
+              else
+                Result += FloatToStrf(Fields[i].AsFloat, ffGeneral, 14, 2, jf);
+            end;
+            ftBoolean: if (Fields[i].AsBoolean) then
+                Result += CheckedImgPath
+              else
+                Result += UncheckedImgPath;
             else
-              Result += '"' + EscapeJSONString(DataSet.FieldByName(
-                aFields[i]).AsString) + '"';
+              Result += '"' + EscapeJSONString(Fields[i].AsString) + '"';
           end;
         end;
       end;
-    except
-      raise Exception.Create('JPJSONEncode error: Unable to Fields!');
+      Result += '}';
+      Next;
+      if not (EOF) then
+        Result += ',';
     end;
-    Result += '}';
-    DataSet.Next;
-    if not (DataSet.EOF) then
-      Result += ',';
   end;
   Result := '[' + Result + ']';
 end;
 
 function TJPJSONEncode.EscapeJSONString(sJSON: string): string;
+var
+  i, j, l: integer;
+  p: PChar;
 begin
-  Result := StringReplace(sJSON, '\', '\\', [rfReplaceAll]);
-  Result := StringReplace(Result, '/', '\/', [rfReplaceAll]);
-  Result := StringReplace(Result, '"', '\"', [rfReplaceAll]);
-  Result := StringReplace(Result, #8, '\b', [rfReplaceAll]);
-  Result := StringReplace(Result, #9, '\t', [rfReplaceAll]);
-  Result := StringReplace(Result, #10, '\n', [rfReplaceAll]);
-  Result := StringReplace(Result, #12, '\f', [rfReplaceAll]);
-  Result := StringReplace(Result, #13, '\r', [rfReplaceAll]);
+  j := 1;
+  Result := '';
+  l := Length(sJSON) + 1;
+  p := PChar(sJSON);
+  for i := 1 to l do
+  begin
+    if (p^ in ['"', '/', '\', #8, #9, #10, #12, #13]) then
+    begin
+      Result += Copy(sJSON, j, i - j);
+      case p^ of
+        '\': Result += '\\';
+        '/': Result += '\/';
+        '"': Result += '\"';
+        #8: Result += '\b';
+        #9: Result += '\t';
+        #10: Result += '\n';
+        #12: Result += '\f';
+        #13: Result += '\r';
+      end;
+      j := i + 1;
+    end;
+    Inc(p);
+  end;
+  Result += Copy(sJSON, j, i - 1);
 end;
 
 end.
